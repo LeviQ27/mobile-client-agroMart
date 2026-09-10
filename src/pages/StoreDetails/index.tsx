@@ -1,8 +1,9 @@
 /* eslint-disable camelcase */
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { SectionList, View, FlatList, Linking, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, FlatList, Linking, Alert } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useCart, TypeItem } from '../../hooks/CartProvider';
 import { useAuth } from '../../hooks/AuthProvider';
@@ -28,7 +29,6 @@ import {
   TitleMenu,
   IconView,
 } from './styles';
-import { StackNavigationProp } from '@react-navigation/stack';
 
 interface Category {
   id: number;
@@ -38,12 +38,14 @@ interface Category {
 
 interface Item {
   id: number;
-  type: string;
+  type: TypeItem;
   name: string;
   quantity: number;
   value: number;
   image: string;
   unity: string;
+  description?: string;
+  storeId: number;
 }
 
 type ParamList = {
@@ -52,31 +54,27 @@ type ParamList = {
     nome: string;
     contato: string;
     descricao: string;
-    banner: {
-      url: string;
-    };
-    produto_avulsos: any[];
-    cestas: any[];
-    planos: any[];
-    endereco: {
-      bairro: string;
-    };
+    banner?: { url: string } | null;
+    produto_avulsos?: any[];
+    cestas?: any[];
+    planos?: any[];
+    endereco?: { bairro?: string };
   };
 };
 
 type NavigationProps = {
-  ProductPage: Item, 
-  Cart: undefined
-}
+  ProductPage: Item;
+  Cart: undefined;
+};
+
+const getImage = (item: any) => item?.url || item?.imagem?.url || item?.imagem?.data?.attributes?.url || '';
+const getValue = (item: any) => Number(item?.valor || item?.value || 0);
+const getQuantity = (item: any) => Number(item?.quantidade || item?.quantity || 0);
 
 const StoreDetails: React.FC = () => {
-  const flatListRef = useRef<any>(null);
-  const selectListRef = useRef<any>(null);
-  const [selecedMenu, setSelectedMenu] = useState(0);
+  const [selectedMenu, setSelectedMenu] = useState(0);
   const navigation = useNavigation<StackNavigationProp<NavigationProps>>();
-
   const [data, setData] = useState<Category[]>([]);
-  console.log({ data });
   const { addItemToCart, cart } = useCart();
   const { user } = useAuth();
 
@@ -87,10 +85,10 @@ const StoreDetails: React.FC = () => {
       contato,
       descricao,
       banner,
-      produto_avulsos,
-      cestas,
-      planos,
-      endereco,
+      produto_avulsos = [],
+      cestas = [],
+      planos = [],
+      endereco = {},
     },
   } = useRoute<RouteProp<ParamList, 'StoreDetails'>>();
 
@@ -101,11 +99,11 @@ const StoreDetails: React.FC = () => {
         title: 'Cestas',
         data: cestas.map(item => ({
           id: item.id,
-          name: `Cesta ${item.id}`,
-          type: 'cesta',
-          image: item.url ?? '',
-          quantity: item.quantidade,
-          value: item.valor,
+          name: item.nome || `Cesta ${item.id}`,
+          type: 'cesta' as TypeItem,
+          image: getImage(item),
+          quantity: getQuantity(item),
+          value: getValue(item),
           unity: 'unidade',
           description: item.descricao,
           storeId: id,
@@ -116,11 +114,11 @@ const StoreDetails: React.FC = () => {
         title: 'Planos',
         data: planos.map(item => ({
           id: item.id,
-          type: 'plano',
-          name: item.nome,
-          image: item.url ?? '',
-          quantity: item.quantidade,
-          value: item.valor,
+          type: 'plano' as TypeItem,
+          name: item.nome || `Plano ${item.id}`,
+          image: getImage(item),
+          quantity: getQuantity(item) || 1,
+          value: getValue(item),
           unity: 'unidade',
           description: item.descricao,
           storeId: id,
@@ -131,12 +129,12 @@ const StoreDetails: React.FC = () => {
         title: 'Produtos',
         data: produto_avulsos.map(item => ({
           id: item.id,
-          type: 'produto',
-          name: item.nome,
-          image: item.url ?? '',
-          quantity: item.quantidade,
-          value: item.valor,
-          unity: item.unidade_medida,
+          type: 'produto' as TypeItem,
+          name: item.nome || `Produto ${item.id}`,
+          image: getImage(item),
+          quantity: getQuantity(item),
+          value: getValue(item),
+          unity: item.unidade_medida || 'unidade',
           description: item.descricao,
           storeId: id,
         })),
@@ -144,35 +142,38 @@ const StoreDetails: React.FC = () => {
     ]);
   }, [cestas, planos, produto_avulsos, id]);
 
-  const handleWhatsAppMessage = useCallback(
-    async (phoneNumber: string): Promise<void> => {
-      await Linking.openURL(`https://wa.me/55${phoneNumber}`).catch(err =>
-        console.log(err),
-      );
-    },
-    [],
-  );
+  const selectedCategory = useMemo(() => data[selectedMenu] || data[0], [data, selectedMenu]);
 
-  const selectMenu = useCallback((index: React.SetStateAction<number>) => {
-    setSelectedMenu(index);
-    if (flatListRef.current) {
-      flatListRef.current?.scrollToIndex({
-        animated: true,
-        index,
-        viewPosition: 0.5,
-      });
-    }
-
-    if (selectListRef.current) {
-      selectListRef.current?.scrollToLocation({
-        sectionIndex: index,
-        itemIndex: 0,
-        // viewPosition: 0,
-        viewOffset: 0,
-        animated: true,
-      });
-    }
+  const handleWhatsAppMessage = useCallback(async (phoneNumber: string): Promise<void> => {
+    if (!phoneNumber) return Alert.alert('Contato indisponível', 'Esta loja ainda não possui telefone cadastrado.');
+    await Linking.openURL(`https://wa.me/55${String(phoneNumber).replace(/\D/g, '')}`).catch(err => console.log(err));
   }, []);
+
+  const selectMenu = useCallback((index: number) => {
+    setSelectedMenu(index);
+  }, []);
+
+  const handleItemPress = (item: Item) => {
+    if (item.type !== 'plano') {
+      return navigation.navigate('ProductPage', item);
+    }
+
+    if (!user) {
+      return Alert.alert('Ops...', 'Você deve estar logado para adicionar um plano ao carrinho.');
+    }
+
+    addItemToCart({
+      id: item.id,
+      name: item.name,
+      quantity: 1,
+      stock: item.quantity || 1,
+      image: item.image,
+      value: item.value,
+      type: 'plano',
+    }, id);
+
+    return navigation.navigate('Cart');
+  };
 
   return (
     <Container>
@@ -180,37 +181,19 @@ const StoreDetails: React.FC = () => {
         <BackHeader />
       </BackHeaderContainer>
       <Header>
-        {banner && (
-          <StoreBanner
-            source={{
-              // uri: `${baseURL}${banner.url}`,
-              uri: `${banner.url}`,
-            }}
-          />
-        )}
+        {banner?.url ? <StoreBanner source={{ uri: banner.url }} /> : null}
         <HeaderContent>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
               <Title>{nome}</Title>
-              <StoreRA>{endereco.bairro}</StoreRA>
+              <StoreRA>{endereco?.bairro || 'Região não informada'}</StoreRA>
             </View>
 
-            <View style={{ flexDirection: 'row' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <IconView
                 onPress={() => {
                   if (!cart.length) {
-                    if (!user) {
-                      return Alert.alert(
-                        'Ops...',
-                        'Você deve estar logado para acessar o carrinho.',
-                      );
-                    }
+                    if (!user) return Alert.alert('Ops...', 'Você deve estar logado para acessar o carrinho.');
                     return Alert.alert('Ops...', 'Seu carrinho está vazio');
                   }
                   return navigation.navigate('Cart');
@@ -219,20 +202,13 @@ const StoreDetails: React.FC = () => {
                 <MaterialCommunityIcons name="cart" size={23} color="#fff" />
               </IconView>
               <IconView onPress={() => handleWhatsAppMessage(contato)}>
-                <MaterialCommunityIcons
-                  name="whatsapp"
-                  size={23}
-                  color="#fff"
-                />
+                <MaterialCommunityIcons name="whatsapp" size={23} color="#fff" />
               </IconView>
             </View>
           </View>
 
           <Separator />
-
-          <Title>Descrição:</Title>
-          <SubTitle>{descricao}</SubTitle>
-
+          <SubTitle>{descricao || 'Esta loja ainda não possui descrição cadastrada.'}</SubTitle>
           <Separator />
         </HeaderContent>
       </Header>
@@ -240,16 +216,13 @@ const StoreDetails: React.FC = () => {
       <Content>
         <View>
           <FlatList
-            ref={flatListRef}
             data={data}
             keyExtractor={item => String(item.id)}
             showsHorizontalScrollIndicator={false}
             renderItem={({ item, index }) => (
               <Touchable onPress={() => selectMenu(index)}>
-                <ContainerItem selected={index === selecedMenu}>
-                  <MenuItem selected={index === selecedMenu}>
-                    {item.title}
-                  </MenuItem>
+                <ContainerItem selected={index === selectedMenu}>
+                  <MenuItem selected={index === selectedMenu}>{item.title}</MenuItem>
                 </ContainerItem>
               </Touchable>
             )}
@@ -257,48 +230,24 @@ const StoreDetails: React.FC = () => {
           />
         </View>
 
-        <SectionList
-          ref={selectListRef}
-          sections={data}
-          keyExtractor={item => String(item.id)}
+        <TitleContainer>
+          <TitleMenu>{selectedCategory?.title || 'Itens'}</TitleMenu>
+        </TitleContainer>
+
+        <FlatList
+          data={selectedCategory?.data || []}
+          keyExtractor={item => `${item.type}-${item.id}`}
+          ListEmptyComponent={() => (
+            <SubTitle style={{ padding: 16 }}>Nenhum item cadastrado nesta aba.</SubTitle>
+          )}
           renderItem={({ item }) => (
             <ProductCard
               image={item.image}
               name={item.name}
               quantity={item.quantity}
               value={item.value}
-              key={item.id}
-              onPress={() => {
-                if (item.type !== 'plano') {
-                  navigation.navigate('ProductPage', item);
-                } else {
-                  if (!user) {
-                    return Alert.alert(
-                      'Ops...',
-                      'Você deve estar logado para adicionar um plano ao carrinho.',
-                    );
-                  }
-                  const plan = {
-                    id: item.id,
-                    name: item.name,
-                    quantity: 1,
-                    stock: item.quantity,
-                    image: item.image,
-                    value: item.value,
-                    type: 'plano' as TypeItem,
-                  };
-
-                  addItemToCart(plan, id);
-                  item.quantity !== 0 && navigation.navigate('Cart');
-                }
-              }}
+              onPress={() => handleItemPress(item)}
             />
-          )}
-          stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section: { title } }) => (
-            <TitleContainer>
-              <TitleMenu>{title}</TitleMenu>
-            </TitleContainer>
           )}
         />
       </Content>

@@ -47,8 +47,8 @@ const SignUp: React.FC = () => {
         };
         await signUp(body);
         navigation.navigate('Home');
-      } catch (error) {
-        Alert.alert('Erro ao cadastrar usuario');
+      } catch (error: any) {
+        Alert.alert('Erro ao cadastrar usuário', error?.message || 'Verifique a conexão com a API.');
       } finally {
         setLoading(false);
       }

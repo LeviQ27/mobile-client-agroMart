@@ -10,7 +10,8 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 
-import initializeApi from '../services/api';
+import initializeApi, { resolveApiBaseUrl } from '../services/api';
+import { getAuthErrorMessage } from '../utils/authError';
 import { Address } from '../interfaces';
 import axios from 'axios';
 
@@ -45,6 +46,7 @@ interface AuthContextData {
   signUp(info: SignUpCredentials): Promise<void>;
   updateUser(updatedUser: User): Promise<void>;
   updateAddress(updatedAddress: Address): Promise<void>;
+  signed: boolean;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -74,6 +76,15 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
     loadStorageData();
   }, []);
 
+  const persistSession = useCallback(async (token: string, user: User) => {
+    await AsyncStorage.multiSet([
+      ['@Agromart:token', token],
+      ['@Agromart:user', JSON.stringify(user)],
+    ]);
+
+    setData({ token, user });
+  }, []);
+
   const updateUser = useCallback(async (updatedUser: User) => {
     await AsyncStorage.multiSet([
       ['@Agromart:user', JSON.stringify(updatedUser)],
@@ -101,54 +112,51 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
 
   const signIn = useCallback(
     async ({ username, password }: SignInCredentials) => {
-      const url = await AsyncStorage.getItem('@BaseUrlChosen');
-      console.log('LOGANDO DENTRO', url);
-      const response = await axios.post(`${url}auth/local`, {
-        identifier: username,
-        password,
-      });
+      const url = await resolveApiBaseUrl();
 
-      const { jwt: token, user } = response.data;
+      try {
+        console.log('Login usando API:', url);
 
-      console.log('TOKEN', token);
+        const response = await axios.post(`${url}auth/local`, {
+          identifier: username,
+          password,
+        });
 
-      await AsyncStorage.multiSet([
-        ['@Agromart:token', token],
-        ['@Agromart:user', JSON.stringify(user)],
-      ]);
+        const { jwt: token, user } = response.data;
 
-      setData({ token, user });
-
-      await registerDeviceInfo(user.id);
+        await persistSession(token, user);
+        await registerDeviceInfo(user.id);
+      } catch (error) {
+        console.log('Erro ao fazer login na API:', error);
+        throw new Error(getAuthErrorMessage(error, url));
+      }
     },
-    [],
+    [persistSession],
   );
 
   const signUp = useCallback(
     async ({ username, password, email }: SignUpCredentials) => {
-      // TODO REMOVE THIS HARD CODED URL THIS IS JUST FOR TESTING
-      const baseUrl =
-        (await AsyncStorage.getItem('@BaseUrlChosen')) ||
-        'https://agromarttcc.shop/api/';
+      const baseUrl = await resolveApiBaseUrl();
 
-      const response = await axios.post(`${baseUrl}auth/local/register`, {
-        username,
-        password,
-        email,
-      });
+      try {
+        console.log('Cadastro usando API:', baseUrl);
 
-      const { jwt: token, user } = response.data;
+        const response = await axios.post(`${baseUrl}auth/local/register`, {
+          username,
+          password,
+          email,
+        });
 
-      await AsyncStorage.multiSet([
-        ['@Agromart:token', token],
-        ['@Agromart:user', JSON.stringify(user)],
-      ]);
+        const { jwt: token, user } = response.data;
 
-      setData({ token, user });
-
-      await registerDeviceInfo(user.id);
+        await persistSession(token, user);
+        await registerDeviceInfo(user.id);
+      } catch (error) {
+        console.log('Erro ao cadastrar usuário na API:', error);
+        throw new Error(getAuthErrorMessage(error, baseUrl));
+      }
     },
-    [],
+    [persistSession],
   );
 
   const signOut = useCallback(async () => {
@@ -162,19 +170,15 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
   }, []);
 
   const registerDeviceInfo = async (userId: number) => {
-    const pushToken = await AsyncStorage.getItem('@Agromart:push_token');
     const api = await initializeApi();
 
     const body = {
       platform: Platform.OS,
       model: Device.modelName,
       platform_version: Device.osVersion,
-      // expo_push_token: pushToken,
       expo_push_token: 'pushTokenTeste123',
       user_id: userId,
     };
-
-    console.log('registerDeviceInfo - body =======> ', body);
 
     try {
       const userHasDeviceRes = await api.get(`devices/user/${userId}`);
@@ -186,8 +190,8 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
 
       return await api.post('devices', body);
     } catch (err: any) {
+      // Esse cadastro não pode bloquear o login do cliente.
       console.log('Erro ao enviar informações do device', err.message);
-      console.log('ERRO ========> ', err);
     }
   };
 
@@ -201,6 +205,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }: any) => {
         signOut,
         updateUser,
         updateAddress,
+        signed: !!data.token && !!data.user,
       }}
     >
       {children}

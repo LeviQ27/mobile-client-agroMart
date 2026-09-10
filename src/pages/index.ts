@@ -15,3 +15,4 @@ export { default as Notifications } from './Notifications';
 export { default as CreditCardRegister } from './CreditCardRegister';
 export { default as BillingAddress } from './BillingAddress';
 export { default as SelectCSA } from './SelectCSA';
+export { default as Payments } from './Payments';

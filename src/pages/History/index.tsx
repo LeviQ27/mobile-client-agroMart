@@ -4,7 +4,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import { Text, ActivityIndicator, Alert } from 'react-native';
 
-import initializeApi from '../../services/api';
+import { ordersService } from '../../services/orders';
 import { useAuth } from '../../hooks/AuthProvider';
 
 import HistoryItemCard from '../../components/HistoryItemCard';
@@ -70,15 +70,8 @@ const History: React.FC = () => {
       setLoading(true);
 
       try {
-        const api = await initializeApi();
-
-        const { data } = await api.get(`extratoes?user=${user.id}`);
-
-        // This is just a terible workaround because the userId filter is not working and I don't have time to fix it
-        // whoever implemented it didn't test it
-        const filteredData = data.filter((record:any) => record?.user?.id === user.id)
-        
-        setHistory(filteredData);
+        const data = await ordersService.listMine();
+        setHistory(data as any);
       } catch (err) {
         Alert.alert('Ops', 'Não foi possivel carregar seu histórico');
       } finally {
@@ -108,16 +101,9 @@ const History: React.FC = () => {
               {history.map(item => (
                 <HistoryItemCard
                   key={item.id}
-                  date={item.created_at}
-                  seller={item.loja.nome}
-                  value={(() => {
-
-                    const itemsArray:Array<any> = Object.values(item.itens);
-
-                    return itemsArray.reduce((accumulator, item) => {
-                      return accumulator + (item.valor * item.quantidade);
-                    }, 0)
-                  })()}
+                  date={(item as any).created_at || (item as any).createdAt}
+                  seller={item.loja?.nome || 'Loja'}
+                  value={Number((item as any).valor_total || item.valor || 0)}
                   extract={item}
                 />
               ))}

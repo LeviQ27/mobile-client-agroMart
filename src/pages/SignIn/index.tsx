@@ -10,7 +10,6 @@ import { useAuth } from '../../hooks/AuthProvider';
 import LogoAgromart from '../../assets/logo.png';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
-import BackHeader from '../../components/BackHeader';
 
 import {
   Container,
@@ -32,7 +31,6 @@ type CSAObj = {
 };
 
 type NavigationProps = {
-  SelectCSA: undefined
   Home: undefined
   SignUp: undefined
 }
@@ -52,7 +50,7 @@ const SignIn: React.FC = () => {
       const jsonparsed = JSON.parse(url ? url : '');
       setcsa(jsonparsed as unknown as CSAObj);
     } else {
-      navigation.navigate('SelectCSA');
+      setcsa(null);
     }
   };
   useEffect(() => {
@@ -68,9 +66,8 @@ const SignIn: React.FC = () => {
 
       try {
         await signIn({ username: data.email, password: data.password });
-        navigation.navigate('Home');
-      } catch (error) {
-        Alert.alert('Erro ao fazer login');
+      } catch (error: any) {
+        Alert.alert('Erro ao fazer login', error?.message || 'Verifique a conexão com a API.');
         console.log(error);
       } finally {
         setLoading(false);
@@ -96,12 +93,14 @@ const SignIn: React.FC = () => {
 
   return (
     <>
-      <BackHeader />
       <Container>
         <Logo source={LogoAgromart} />
         <AppName>AgroMart</AppName>
-        <CSAChosen>{`utilizando CSA: "${csa?.nomeCSA}"`}</CSAChosen>
-        <CSAChosen>{`utilizando CSA: "${urlcsa}"`}</CSAChosen>
+        {csa?.nomeCSA ? (
+          <CSAChosen>{`utilizando CSA: "${csa.nomeCSA}"`}</CSAChosen>
+        ) : (
+          <CSAChosen>Entre para acessar os módulos do AgroMart</CSAChosen>
+        )}
         <Input
           placeholder="E-mail"
           autoCorrect={false}

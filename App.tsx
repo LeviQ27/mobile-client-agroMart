@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StatusBar, View } from 'react-native';
+import { Platform, StatusBar, View } from 'react-native';
 // import * as Notifications from 'expo-notifications';
 // import * as Permissions from 'expo-permissions';
 import { NavigationContainer } from '@react-navigation/native';
@@ -16,7 +16,9 @@ import AppProvider from './src/hooks';
 import { colors } from './src/styles';
 import Routes from './src/routes';
 
-SplashScreen.preventAutoHideAsync(); // Prevent auto-hiding the splash screen
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync().catch(() => undefined);
+}
 
 const App: React.FC = () => {
   // const updateApp = async () => {
@@ -53,17 +55,17 @@ const App: React.FC = () => {
   //   await AsyncStorage.setItem('@Agromart:push_token', pushToken);
   // };
 
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Montserrat_400Regular,
     Montserrat_300Light,
     Montserrat_700Bold,
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync(); // Hide the splash screen once fonts are loaded
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [fontsLoaded]);
+  }, [fontError, fontsLoaded]);
 
   const TopBar = () => (
     <>
@@ -72,7 +74,7 @@ const App: React.FC = () => {
     </>
   );
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded && !fontError) {
     return null;
   }
 

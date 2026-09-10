@@ -37,7 +37,7 @@ const Product: React.FC = () => {
   const { cart, addItemToCart, removeItemToCart } = useCart();
   const { user } = useAuth();
   const [hasOnCart, setHasOnCart] = useState(false);
-  const [wishQuantity, setWishQuantity] = useState(0);
+  const [wishQuantity, setWishQuantity] = useState(1);
 
 type NavigationProp = {
   Cart: undefined
@@ -48,6 +48,9 @@ type NavigationProp = {
     params: { id, name, type, quantity, value, image, description, storeId },
   } = useRoute<RouteProp<ParamList, 'ProductPage'>>();
 
+  const availableQuantity = Number(quantity || 0);
+  const maxQuantity = availableQuantity > 1 ? availableQuantity : 99;
+
   useEffect(() => {
     const foundItem = cart.find(item => item.id === id && item.type === type);
 
@@ -56,19 +59,16 @@ type NavigationProp = {
       setWishQuantity(foundItem.quantity);
     } else {
       setHasOnCart(false);
+      setWishQuantity(1);
     }
   }, [cart, id, type]);
 
   const incrementQuantity = () => {
-    if (wishQuantity === quantity) return;
-
-    setWishQuantity(prevState => prevState + 1);
+    setWishQuantity(prevState => Math.min(prevState + 1, maxQuantity));
   };
 
   const decrementQuantity = () => {
-    if (wishQuantity <= 0) return;
-
-    setWishQuantity(prevState => prevState - 1);
+    setWishQuantity(prevState => Math.max(prevState - 1, 1));
   };
 
   const handleAddItem = () => {
@@ -76,11 +76,15 @@ type NavigationProp = {
       return Alert.alert('Ops..', 'Você deve estar logado para fazer pedidos');
     }
 
+    if (wishQuantity <= 0) {
+      return Alert.alert('Ops..', 'Informe ao menos uma unidade para adicionar ao carrinho.');
+    }
+
     const item = {
       id,
       name,
       quantity: wishQuantity,
-      stock: quantity,
+      stock: maxQuantity,
       image,
       value,
       type,

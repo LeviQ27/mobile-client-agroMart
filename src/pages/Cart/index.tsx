@@ -26,7 +26,7 @@ import Button from '../../components/Button';
 // Context imports
 import { useAuth } from '../../hooks/AuthProvider';
 import { useCart } from '../../hooks/CartProvider';
-import initializeApi from '../../services/api';
+import { ordersService } from '../../services/orders';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 interface StockParams {
@@ -37,8 +37,9 @@ interface StockParams {
 
 
 type NavigationProps = {
-  History: undefined, 
-  AddressForm: undefined
+  History: undefined;
+  AddressForm: undefined;
+  Payments: undefined;
 }
 
 const CartScreen: React.FC = () => {
@@ -63,102 +64,40 @@ const CartScreen: React.FC = () => {
   }, [cart, navigation]);
 
   const sendSubscriberData = async () => {
-    const updateStockRequestModifier = {
-      produto: async (item: StockParams) => {
-        try {
-          const api = await initializeApi();
-
-          const body = {
-            quantidade: item.stock - item.quantity,
-          };
-          await api.put(`produtos-avulsos/${item.id}`, body);
-        } catch (err) {
-          console.log(err);
-        }
-      },
-      cesta: async (item: StockParams) => {
-        try {
-          const body = {
-            quantidade: item.stock - item.quantity,
-          };
-          const api = await initializeApi();
-
-          await api.put(`cestas/${item.id}`, body);
-        } catch (err) {
-          console.log(err);
-        }
-      },
-      plano: async (item: StockParams) => {
-        try {
-          const body = {
-            quantidade: item.stock - item.quantity,
-          };
-
-          const api = await initializeApi();
-
-          const response = await api.put(`planos/${item.id}`, body);
-
-          const { id, quantidade_de_cestas } = response.data;
-
-          const subscriberBody = {
-            nome: user.username,
-            cestas_disponiveis: quantidade_de_cestas,
-            planos: item.id,
-            usuario: user.id,
-            loja: storeId,
-          };
-
-          await api.post('assinantes', subscriberBody);
-        } catch (err) {
-          console.log(err);
-        }
-      },
-    };
-    const extractBody = {
-      valor: getTotal(),
-      user: user.id,
-      loja: storeId,
-      itens: {
-        produtos: [] as any,
-      },
-      pagamento_realizado: false,
-    };
-    cart.forEach(item => {
-      console.log('type', item.type);
-      updateStockRequestModifier[item.type](item);
-
-      extractBody.itens = {
-        produtos: [
-          ...extractBody.itens.produtos,
-          {
-            produto: item.name,
-            quantidade: item.quantity,
-            valor: item.value,
-          },
-        ],
-      };
-    });
-
-    try {
-      const api = await initializeApi();
-
-      await api.post('extratoes', extractBody);
-      cleanUpCart();
-    } catch (error) {
-      console.log('Erro', error);
+    if (!storeId) {
+      throw new Error('Loja do pedido não identificada.');
     }
+
+    const pedidoBody = {
+      loja: storeId,
+      valor_total: getTotal(),
+      tipo_entrega: 'Receber',
+      itens: cart.map(item => ({
+        id: item.id,
+        tipo: item.type,
+        nome: item.name,
+        quantidade: item.quantity,
+        valor_unitario: item.value,
+        valor_total: item.value * item.quantity,
+      })),
+      observacao: 'Pedido realizado pelo mobile client AgroMart',
+    };
+
+    await ordersService.createPedido(pedidoBody);
+    cleanUpCart();
   };
 
   const handleFinish = async () => {
     setLoading(true);
     try {
       await sendSubscriberData();
-      navigation.navigate('History');
+      navigation.navigate('Payments');
 
       // VOLTAR PARA BILLING ADDRESS QUANDO ARRUMAR PAGAMENTO POR CARTÃO
       // navigation.navigate('BillingAddress');
-    } catch {
-      Alert.alert('Ops...', 'Não foi possível prosseguir para o pagamento.');
+    } catch (error: any) {
+      const message = error?.response?.data?.error?.message || error?.message || 'Não foi possível prosseguir para o pagamento.';
+      Alert.alert('Ops...', message);
     }
     setLoading(false);
   };

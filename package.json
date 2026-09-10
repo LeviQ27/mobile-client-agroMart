@@ -7,11 +7,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web:clear": "expo start --web --clear",
+    "web:ci": "EXPO_OFFLINE=1 expo start --web --clear"
   },
   "dependencies": {
     "@expo-google-fonts/montserrat": "^0.2.3",
     "@expo/vector-icons": "^13.0.0",
+    "@expo/webpack-config": "^19.0.1",
     "@react-native-async-storage/async-storage": "1.18.2",
     "@react-native-community/clipboard": "^1.5.1",
     "@react-native-community/masked-view": "^0.1.11",
@@ -25,6 +28,7 @@
     "expo": "~49.0.23",
     "expo-dev-client": "~2.4.13",
     "expo-device": "~5.4.0",
+    "expo-document-picker": "~11.5.4",
     "expo-font": "~11.4.0",
     "expo-linear-gradient": "~12.3.0",
     "expo-splash-screen": "~0.20.5",
@@ -32,7 +36,9 @@
     "formik": "^2.4.6",
     "lottie-react-native": "5.1.6",
     "moment": "^2.30.1",
+    "qrcode": "^1.5.4",
     "react": "18.2.0",
+    "react-dom": "18.2.0",
     "react-hook-form": "^7.52.2",
     "react-native": "0.72.10",
     "react-native-element-dropdown": "^2.12.1",
@@ -44,6 +50,7 @@
     "react-native-screens": "~3.22.0",
     "react-native-snap-carousel": "^3.9.1",
     "react-native-tab-view": "^3.5.2",
+    "react-native-web": "~0.19.6",
     "rn-credit-card": "^1.0.4",
     "styled-components": "^5.3.11",
     "updates": "^16.4.0",
@@ -51,6 +58,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@expo/webpack-config": "^19.0.1",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "~18.2.14",
     "@types/react-dom": "~18.0.10",
     "@types/react-native-snap-carousel": "^3.8.11",
@@ -60,5 +69,6 @@
     "react-native-dotenv": "^3.4.11",
     "typescript": "^5.5.4"
   },
-  "private": true
+  "private": true,
+  "packageManager": "yarn@4.10.2+sha512.0b0e54ad5381f0a35184957bd3ea44e37f5a4fb1960b903b0fb9a3c7c2c009190455c41ef2a1977b1dbd3b72c5f152da696e9c52e2bc78a011b6adea8ee73ba3"
 }

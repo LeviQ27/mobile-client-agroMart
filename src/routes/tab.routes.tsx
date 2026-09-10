@@ -6,6 +6,7 @@ import Home from '../pages/Home';
 import Search from '../pages/Search';
 import Profile from '../pages/Profile';
 import History from '../pages/History';
+import Payments from '../pages/Payments';
 
 const Tab = createBottomTabNavigator();
 
@@ -43,6 +44,15 @@ const TabRoutes: React.FC = () => (
       options={{
         tabBarIcon: ({ color, size }) => (
           <Feather name="user" size={size} color={color} />
+        ),
+      }}
+    />
+    <Tab.Screen
+      name="Payments"
+      component={Payments}
+      options={{
+        tabBarIcon: ({ color, size }) => (
+          <Feather name="credit-card" size={size} color={color} />
         ),
       }}
     />

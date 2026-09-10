@@ -9,6 +9,7 @@ export interface Store {
   cnpj: string;
   endereco: Address;
   produtos_avulsos: Product[];
+  produto_avulsos: Product[];
   planos: Plan[];
   cestas: Cest[];
 }
