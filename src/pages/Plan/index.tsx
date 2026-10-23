@@ -1,134 +1,28 @@
-/* eslint-disable camelcase */
-import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, Alert } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
-
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, View, Switch, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import initializeApi from '../../services/api';
-import { useAuth } from '../../hooks/AuthProvider';
-import { useStores } from '../../hooks/StoresProvider';
-
 import BackHeader from '../../components/BackHeader';
-import PlanCard from '../../components/PlanCard';
-
-import { colors } from '../../styles';
-
-import { Container, Content, PlanContainer } from './styles';
-
-// THIS TYPE IS ALL WRONG, BUT I DON'T HAVE TIME TO FIX IT, THE BACKEND OF THIS PART IS NOT WORKING PROPERLY AS WELL
-type PlanInfo = {
-  id: number;
-  cestas_disponiveis: number;
-  pular_cesta: boolean;
-  plano: {
-    nome: string;
-    quantidade_de_cestas: number;
-    imagem: {
-      url: string;
-    };
-    loja: number;
-  };
-  planos:
-    | {
-        nome: string;
-        quantidade_de_cestas: number;
-        imagem: {
-          url: string;
-        };
-        loja: number;
-      }
-    | Array<{
-        nome: string;
-
-        quantidade_de_cestas: number;
-        imagem: {
-          url: string;
-        };
-        loja: number;
-      }>;
-  created_at: string;
-} | any;
-
-const Plan: React.FC = () => {
-  const [plans, setPlans] = useState<PlanInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const { user } = useAuth();
-  const { stores } = useStores();
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const api = await initializeApi();
-        console.log('user0', user.username);
-        let { data } = await api.get(`assinantes`);
-
-        // THIS IS A FILTER IMPLEMENTED IN A VERY POOR WAY, UNFORTUNATELY, THE BACKEND IS NOT SAVING THE USER RELATION PROPERLY IN "ASSINANTES"
-        data = data.filter((assinante:any) => assinante?.nome === user.username)
-
-        console.log('planos', data);
-
-        setPlans(data);
-      } catch (err) {
-        console.log('planos', err);
-        Alert.alert('Ops', 'Não foi possivel carregar seus planos');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, [user.id]);
-
-  return (
-    <Container>
-      <BackHeader text="Meus Planos" />
-
-      <ScrollView>
-        <Content>
-          {loading && (
-            <ActivityIndicator size="large" color={`${colors.secondary}`} />
-          )}
-          {!loading && (
-            <PlanContainer>
-              {plans.map(item => (
-                <PlanCard
-                  key={item?.id}
-                  id={item?.id}
-                  switchInitialValue={item?.pular_cesta}
-                  acquisitionDate={item?.created_at}
-                  avaliableBasket={item?.cestas_disponiveis}
-                  recievedBasket={
-                    (item?.plano?.quantidade_de_cestas ??
-                      item?.planos[0]?.quantidade_de_cestas ??
-                      item?.planos?.quantidade_de_cestas) -
-                    item?.cestas_disponiveis
-                  }
-                  // contact={
-                  //   stores.find(
-                  //     store =>
-                  //       store.id === item?.planos[0]?.loja ??
-                  //       item?.plano?.loja ??
-                  //       item?.planos?.loja,
-                  //   )?.contato || ''
-                  // }
-                  image={item?.plano?.imagem?.url}
-                  name={
-                    item?.plano?.nome ??
-                    item?.planos[0]?.nome ??
-                    item?.planos?.nome
-                  }
-                  // store={
-                  //   stores.find(store => store.id === item?.plano?.loja)
-                  //     ?.nome || ''
-                  // }
-                />
-              ))}
-            </PlanContainer>
-          )}
-        </Content>
-      </ScrollView>
-    </Container>
-  );
+type Subscription={id:number;status:string;periodicidade:string;valor_por_ciclo:number;proxima_cobranca:string;pular_proxima_cesta:boolean;plano?:{nome:string};loja?:{nome:string}};
+const unpack=(response:any)=>{const raw=response?.data?.data||response?.data||[];return (Array.isArray(raw)?raw:[]).map((x:any)=>({id:x.id,...(x.attributes||x)}));};
+const Plan:React.FC=()=>{
+ const [plans,setPlans]=useState<Subscription[]>([]);const [loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{setLoading(true);try{const api=await initializeApi();setPlans(unpack(await api.get('assinaturas/me')));}catch(e:any){Alert.alert('Erro',e?.response?.data?.error?.message||'Não foi possível carregar suas assinaturas');}finally{setLoading(false);}},[]);
+ useFocusEffect(useCallback(()=>{load();},[load]));
+ const update=async(id:number,action:'pular'|'cancelar',value?:boolean)=>{
+  try{const api=await initializeApi();await api.put(`assinaturas/${id}/${action}`,action==='pular'?{pular:value}:{});await load();}catch(e:any){Alert.alert('Erro',e?.response?.data?.error?.message||'Não foi possível atualizar a assinatura');}
+ };
+ return <View style={{flex:1,backgroundColor:'#fff'}}><BackHeader text="Minhas assinaturas" />
+  {loading?<ActivityIndicator style={{marginTop:35}}/>:<ScrollView contentContainerStyle={{padding:18}}>
+   {!plans.length&&<Text>Você ainda não possui assinaturas.</Text>}
+   {plans.map(p=><View key={p.id} style={{borderWidth:1,borderColor:'#ddd',borderRadius:12,padding:16,marginBottom:14}}>
+    <Text style={{fontSize:20,fontWeight:'bold',marginBottom:8}}>{p.plano?.nome||`Plano #${p.id}`}</Text>
+    <Text>Loja: {p.loja?.nome||'—'}</Text><Text>Periodicidade: {p.periodicidade==='SEMANAL'?'Semanal':'Mensal'}</Text>
+    <Text>Valor por ciclo: R$ {Number(p.valor_por_ciclo).toFixed(2)}</Text><Text>Status: {p.status}</Text>
+    <Text>Próxima cobrança: {new Date(p.proxima_cobranca).toLocaleDateString('pt-BR')}</Text>
+    {p.status==='ATIVA'&&<><View style={{flexDirection:'row',alignItems:'center',marginTop:12}}><Text style={{flex:1}}>Pular próxima cesta</Text><Switch value={Boolean(p.pular_proxima_cesta)} onValueChange={v=>update(p.id,'pular',v)}/></View>
+    <TouchableOpacity onPress={()=>Alert.alert('Cancelar assinatura','Cancelar as próximas renovações?', [{text:'Voltar',style:'cancel'},{text:'Cancelar assinatura',style:'destructive',onPress:()=>update(p.id,'cancelar')}])} style={{marginTop:10}}><Text style={{color:'#b71c1c'}}>Cancelar assinatura</Text></TouchableOpacity></>}
+   </View>)}
+  </ScrollView>}</View>;
 };
-
 export default Plan;

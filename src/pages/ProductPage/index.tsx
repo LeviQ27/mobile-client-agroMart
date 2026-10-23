@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
-import { Alert } from 'react-native';
+import { Alert, View, Text, TouchableOpacity } from 'react-native';
 import { useCart, TypeItem } from '../../hooks/CartProvider';
 import { useAuth } from '../../hooks/AuthProvider';
 
@@ -30,6 +30,7 @@ type ParamList = {
     image: string;
     description: string;
     storeId: number;
+    unity?: string;
   };
 };
 
@@ -38,6 +39,7 @@ const Product: React.FC = () => {
   const { user } = useAuth();
   const [hasOnCart, setHasOnCart] = useState(false);
   const [wishQuantity, setWishQuantity] = useState(1);
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'g'>('kg');
 
 type NavigationProp = {
   Cart: undefined
@@ -45,9 +47,12 @@ type NavigationProp = {
 
   const navigation = useNavigation<StackNavigationProp<NavigationProp>>();
   const {
-    params: { id, name, type, quantity, value, image, description, storeId },
+    params: { id, name, type, quantity, value, image, description, storeId, unity },
   } = useRoute<RouteProp<ParamList, 'ProductPage'>>();
 
+  const weightBased = ['kg', 'quilo', 'quilograma'].includes(String(unity || '').toLowerCase());
+  const step = weightBased && weightUnit === 'g' ? 100 : 1;
+  const actualQuantity = weightBased && weightUnit === 'g' ? wishQuantity / 1000 : wishQuantity;
   const availableQuantity = Number(quantity || 0);
   const maxQuantity = availableQuantity > 1 ? availableQuantity : 99;
 
@@ -56,19 +61,19 @@ type NavigationProp = {
 
     if (foundItem) {
       setHasOnCart(true);
-      setWishQuantity(foundItem.quantity);
+      setWishQuantity(weightBased && weightUnit === 'g' ? Math.max(100, Math.round(foundItem.quantity * 1000)) : foundItem.quantity);
     } else {
       setHasOnCart(false);
       setWishQuantity(1);
     }
-  }, [cart, id, type]);
+  }, [cart, id, type, weightBased]);
 
   const incrementQuantity = () => {
-    setWishQuantity(prevState => Math.min(prevState + 1, maxQuantity));
+    setWishQuantity(prevState => Math.min(prevState + step, weightBased && weightUnit === 'g' ? maxQuantity * 1000 : maxQuantity));
   };
 
   const decrementQuantity = () => {
-    setWishQuantity(prevState => Math.max(prevState - 1, 1));
+    setWishQuantity(prevState => Math.max(prevState - step, step));
   };
 
   const handleAddItem = () => {
@@ -76,14 +81,14 @@ type NavigationProp = {
       return Alert.alert('Ops..', 'Você deve estar logado para fazer pedidos');
     }
 
-    if (wishQuantity <= 0) {
+    if (actualQuantity <= 0) {
       return Alert.alert('Ops..', 'Informe ao menos uma unidade para adicionar ao carrinho.');
     }
 
     const item = {
       id,
       name,
-      quantity: wishQuantity,
+      quantity: actualQuantity,
       stock: maxQuantity,
       image,
       value,
@@ -105,6 +110,11 @@ type NavigationProp = {
         />
       </ProductContainer>
 
+      {weightBased && (
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 14 }}>
+          {(['kg', 'g'] as const).map(unit => <TouchableOpacity key={unit} onPress={() => { setWeightUnit(unit); setWishQuantity(unit === 'g' ? 100 : 1); }} style={{ padding: 10, marginHorizontal: 6, borderRadius: 6, backgroundColor: weightUnit === unit ? '#d9eddf' : '#eeeeee' }}><Text>{unit}</Text></TouchableOpacity>)}
+        </View>
+      )}
       <RowView>
         <QuantityInput
           value={wishQuantity}
